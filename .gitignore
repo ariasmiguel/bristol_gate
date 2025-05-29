@@ -25,6 +25,7 @@ MANIFEST
 
 # Cursor
 .cursor/ 
+.cursorignore
 
 # Virtual environments
 venv/
