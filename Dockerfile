@@ -1,8 +1,8 @@
 # Bristol Gate - Financial Data Pipeline
 # Multi-stage Docker build for optimal image size and security
 
-# Build stage - Install dependencies
-FROM python:3.11-slim as builder
+# Build stage - Install dependencies and package
+FROM python:3.11-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -14,50 +14,55 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy package files for installation
+COPY pyproject.toml .
+COPY src_pipeline/ src_pipeline/
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install the Bristol Gate package to system site-packages
+RUN pip install --no-cache-dir .
 
 # Production stage - Minimal runtime image
 FROM python:3.11-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/root/.local/bin:$PATH"
+    PYTHONDONTWRITEBYTECODE=1
 
-# Create non-root user for security
-RUN groupadd -r bristol && useradd -r -g bristol bristol
-
-# Install runtime dependencies
+# Install runtime dependencies first (as root)
 RUN apt-get update && apt-get install -y \
     curl \
     wget \
     chromium \
     chromium-driver \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Set Chrome/Chromium environment variables
 ENV CHROME_BIN=/usr/bin/chromium \
     CHROME_DRIVER_PATH=/usr/bin/chromedriver
 
+# Copy Python environment and packages from builder stage
+COPY --from=builder /usr/local/lib/python3.11 /usr/local/lib/python3.11
+COPY --from=builder /usr/local/bin /usr/local/bin
+
 # Set working directory
 WORKDIR /app
 
-# Copy Python dependencies from builder stage
-COPY --from=builder /root/.local /root/.local
+# Copy application scripts and configuration
+COPY scripts/ scripts/
+COPY data/ data/
+COPY sql/ sql/
+COPY env.example .env
 
-# Copy application code
-COPY . .
+# Make scripts executable
+RUN chmod +x scripts/*.sh
 
 # Create necessary directories with proper permissions
-RUN mkdir -p data/bronze data/silver data/gold logs downloads && \
-    chown -R bristol:bristol /app
+RUN mkdir -p data/bronze data/silver data/gold logs downloads
 
-# Copy environment template
-RUN cp .env.docker .env.docker
+# Create non-root user for security and set ownership
+RUN groupadd -r bristol && useradd -r -g bristol bristol && \
+    chown -R bristol:bristol /app
 
 # Switch to non-root user
 USER bristol
@@ -69,5 +74,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import src_pipeline; print('Bristol Gate is healthy')" || exit 1
 
-# Default command - run a quick validation
-CMD ["python", "-c", "from src_pipeline.pipelines.data_collection import DataCollectionPipeline; print('Bristol Gate Docker container is ready!')"] 
+# Default command - run setup validation
+CMD ["python", "-c", "from src_pipeline.pipelines.data_collection import DataCollectionPipeline; from src_pipeline.core.config_manager import ConfigurationManager; print('✅ Bristol Gate Docker container is ready!')"] 

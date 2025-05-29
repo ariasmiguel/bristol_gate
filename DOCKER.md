@@ -72,14 +72,29 @@ volumes:
 
 ## 📊 **Pipeline Execution**
 
+### **Automated Scripts (Recommended)**
+```bash
+# Initial setup with comprehensive data collection
+docker-compose run bristol-gate ./scripts/initial_setup.sh
+
+# Daily incremental updates
+docker-compose run bristol-gate ./scripts/incremental_update.sh
+
+# Incremental updates with specific sources
+docker-compose run bristol-gate ./scripts/incremental_update.sh --sources yahoo,fred
+
+# Quick updates without feature generation
+docker-compose run bristol-gate ./scripts/incremental_update.sh --skip-features
+```
+
 ### **Manual Pipeline Run**
 ```bash
 # Run complete pipeline manually
 docker-compose run bristol-gate sh -c "
-  python setup_duckdb.py --load-symbols &&
-  python run_data_collection.py --sources yahoo,fred &&
-  python run_aggregate_series.py &&
-  python run_features_pipeline.py
+  python scripts/setup_duckdb.py --load-symbols &&
+  python scripts/run_data_collection.py --sources yahoo,fred &&
+  python scripts/run_aggregate_series.py &&
+  python scripts/run_features_pipeline.py
 "
 ```
 

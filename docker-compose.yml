@@ -1,7 +1,35 @@
-version: '3.8'
-
 services:
-  # Main Bristol Gate Application
+  # Main Bristol Gate Application - Initial Setup
+  bristol-gate-setup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bristol-gate-setup
+    environment:
+      - FRED_API_KEY=${FRED_API_KEY}
+      - EIA_TOKEN=${EIA_TOKEN}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CHROME_DRIVER_PATH=/usr/bin/chromedriver
+    volumes:
+      # Persist data and database
+      - bristol_data:/app/data
+      - bristol_logs:/app/logs
+      # Mount config if you want to override
+      - ./.env:/app/.env:ro
+    networks:
+      - bristol-network
+    restart: "no"  # Run once for initial setup
+    command: >
+      sh -c "
+        echo '🚀 Bristol Gate - Initial Setup via Docker' &&
+        echo 'Installing package...' &&
+        pip install -e . &&
+        echo 'Running initial setup script...' &&
+        ./scripts/initial_setup.sh &&
+        echo '✅ Initial setup complete!'
+      "
+
+  # Main Bristol Gate Application - Production Runtime
   bristol-gate:
     build:
       context: .
@@ -10,7 +38,6 @@ services:
     environment:
       - FRED_API_KEY=${FRED_API_KEY}
       - EIA_TOKEN=${EIA_TOKEN}
-      - DB_PATH=/app/data/bristol_gate.duckdb
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - CHROME_DRIVER_PATH=/usr/bin/chromedriver
     volumes:
@@ -22,58 +49,18 @@ services:
     networks:
       - bristol-network
     depends_on:
-      - setup
+      bristol-gate-setup:
+        condition: service_completed_successfully
     restart: unless-stopped
     command: >
       sh -c "
-        echo 'Initializing Bristol Gate Pipeline...' &&
-        python setup_duckdb.py --load-symbols &&
-        echo 'Starting data collection...' &&
-        python run_data_collection.py --sources yahoo,fred &&
-        echo 'Creating aggregated dataset...' &&
-        python run_aggregate_series.py &&
-        echo 'Generating features...' &&
-        python run_features_pipeline.py &&
-        echo 'Pipeline complete! Keeping container alive...' &&
+        echo '📊 Bristol Gate - Production Runtime' &&
+        pip install -e . &&
+        echo 'Running incremental update...' &&
+        ./scripts/incremental_update.sh &&
+        echo 'Production run complete. Keeping container alive for monitoring...' &&
         tail -f /dev/null
       "
-
-  # Setup service to initialize the database
-  setup:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: bristol-gate-setup
-    environment:
-      - DB_PATH=/app/data/bristol_gate.duckdb
-    volumes:
-      - bristol_data:/app/data
-    networks:
-      - bristol-network
-    command: >
-      sh -c "
-        echo 'Setting up Bristol Gate database...' &&
-        python setup_duckdb.py --load-symbols &&
-        echo 'Database setup complete!'
-      "
-    restart: "no"
-
-  # Optional: Web interface for monitoring (future enhancement)
-  # bristol-web:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.web
-  #   container_name: bristol-gate-web
-  #   ports:
-  #     - "8000:8000"
-  #   environment:
-  #     - DB_PATH=/app/data/bristol_gate.duckdb
-  #   volumes:
-  #     - bristol_data:/app/data:ro
-  #   networks:
-  #     - bristol-network
-  #   depends_on:
-  #     - bristol-gate
 
   # Cron service for scheduled data updates
   bristol-scheduler:
@@ -84,8 +71,8 @@ services:
     environment:
       - FRED_API_KEY=${FRED_API_KEY}
       - EIA_TOKEN=${EIA_TOKEN}
-      - DB_PATH=/app/data/bristol_gate.duckdb
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CHROME_DRIVER_PATH=/usr/bin/chromedriver
     volumes:
       - bristol_data:/app/data
       - bristol_logs:/app/logs
@@ -93,16 +80,53 @@ services:
     networks:
       - bristol-network
     depends_on:
+      bristol-gate:
+        condition: service_started
+    restart: unless-stopped
+    user: root  # Need root for cron
+    command: >
+      sh -c "
+        echo '⏰ Bristol Gate - Scheduler Setup' &&
+        pip install -e . &&
+        echo 'Setting up daily cron jobs...' &&
+        echo '# Bristol Gate Daily Updates' > /etc/cron.d/bristol-gate &&
+        echo '0 6 * * * bristol cd /app && ./scripts/incremental_update.sh >> /app/logs/cron.log 2>&1' >> /etc/cron.d/bristol-gate &&
+        echo '30 7 * * * bristol cd /app && ./scripts/incremental_update.sh --sources yahoo >> /app/logs/cron.log 2>&1' >> /etc/cron.d/bristol-gate &&
+        chmod 0644 /etc/cron.d/bristol-gate &&
+        crontab /etc/cron.d/bristol-gate &&
+        echo 'Cron jobs installed:' &&
+        crontab -l &&
+        echo 'Starting cron daemon...' &&
+        cron -f
+      "
+
+  # Optional: Monitoring service
+  bristol-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bristol-gate-monitor
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - bristol_data:/app/data:ro
+      - bristol_logs:/app/logs:ro
+    networks:
+      - bristol-network
+    depends_on:
       - bristol-gate
     restart: unless-stopped
     command: >
       sh -c "
-        echo 'Setting up scheduler for daily updates...' &&
-        echo '0 6 * * * cd /app && python run_data_collection.py' | crontab - &&
-        echo '30 6 * * * cd /app && python run_aggregate_series.py' | crontab - &&
-        echo '0 7 * * * cd /app && python run_features_pipeline.py' | crontab - &&
-        echo 'Scheduler configured. Starting cron...' &&
-        cron -f
+        echo '📊 Bristol Gate - Monitoring Service' &&
+        pip install -e . &&
+        echo 'Starting monitoring loop...' &&
+        while true; do
+          echo '📈 Checking Bristol Gate status at: $(date)' &&
+          ls -la data/silver/featured_data_*.parquet | tail -1 &&
+          echo 'Health check complete. Sleeping for 1 hour...' &&
+          sleep 3600
+        done
       "
 
 volumes:

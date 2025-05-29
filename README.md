@@ -10,14 +10,18 @@ git clone https://github.com/ariasmiguel/bristol_gate.git
 cd bristol_gate
 ```
 
-### **2. Set Up Python Environment**
+### **2. Set Up Python Environment & Install Package**
 ```bash
 # Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the Bristol Gate Pipeline package
+pip install -e .
+
+# This installs bristol-gate-pipeline package with all dependencies
+# The package contains src_pipeline modules for data collection, 
+# aggregation, and feature engineering
 ```
 
 ### **3. Configure API Keys**
@@ -34,24 +38,44 @@ cp env.example .env
 - **FRED API Key**: [Register here](https://fred.stlouisfed.org/docs/api/api_key.html) (Free)
 - **EIA API Key**: [Register here](https://www.eia.gov/opendata/register.php) (Free)
 
-### **4. Initialize Database**
+### **4. Run the Complete Pipeline**
+
+**Option A: Using Bash Scripts (Recommended)**
 ```bash
-python setup_duckdb.py --load-symbols
+# First-time setup (includes database initialization and full data collection)
+./scripts/initial_setup.sh
+
+# Daily updates (incremental data collection and feature regeneration)
+./scripts/incremental_update.sh
 ```
 
-### **5. Run the Pipeline**
+**Option B: Step-by-Step Manual Execution**
 ```bash
-# Step 1: Collect data (starts with small sample for testing)
-python run_data_collection.py --sources yahoo,fred
+# Step 1: Initialize database
+python scripts/setup_duckdb.py --load-symbols
 
-# Step 2: Create aggregated dataset
-python run_aggregate_series.py
+# Step 2: Collect data (starts with small sample for testing)
+python scripts/run_data_collection.py --sources yahoo,fred
 
-# Step 3: Generate ML-ready features
-python run_features_pipeline.py
+# Step 3: Create aggregated dataset
+python scripts/run_aggregate_series.py
+
+# Step 4: Generate ML-ready features
+python scripts/run_features_pipeline.py
 ```
 
-### **6. Access Your Data**
+**Option C: Docker (Easy Deployment)**
+```bash
+# Copy environment template
+cp env.example .env
+# Edit .env with your API keys
+
+# Run with Docker Compose
+docker-compose up bristol-gate-setup    # Initial setup
+docker-compose up bristol-gate          # Production run
+```
+
+### **5. Access Your Data**
 ```python
 import pandas as pd
 
@@ -73,7 +97,7 @@ print(f"Available features: {list(df.columns)[:10]}...")  # First 10 features
 **❌ "Database not found" error:**
 ```bash
 # Make sure you ran the database setup step
-python setup_duckdb.py --load-symbols
+python scripts/setup_duckdb.py --load-symbols
 ```
 
 **❌ "API key not found" or "401 Unauthorized":**
@@ -82,16 +106,20 @@ python setup_duckdb.py --load-symbols
 FRED_API_KEY=abcd1234your_actual_key_here
 EIA_TOKEN=your_actual_eia_token_here
 
-# Make sure .env is in the root directory (same level as run_data_collection.py)
+# Make sure .env is in the root directory (same level as pyproject.toml)
 ls -la .env
 ```
 
 **❌ "No module named 'src_pipeline'":**
 ```bash
-# Make sure you're in the bristol_gate directory and venv is activated
-cd bristol_gate
-source venv/bin/activate  # or venv\Scripts\activate on Windows
-python run_data_collection.py --sources yahoo
+# Make sure you installed the package properly
+pip install -e .
+
+# Verify the package is installed
+pip show bristol-gate-pipeline
+
+# Test the import
+python -c "import src_pipeline; print('✅ Package installed correctly')"
 ```
 
 **❌ "ChromeDriver not found" (for web scraping sources):**
@@ -106,7 +134,7 @@ brew install chromedriver
 **❌ Want to test without API keys first?**
 ```bash
 # Test with sources that don't require API keys
-python run_data_collection.py --sources yahoo,baker
+python scripts/run_data_collection.py --sources yahoo,baker
 ```
 
 **❌ Pipeline runs but no data collected:**
@@ -144,22 +172,50 @@ For commercial licensing inquiries, please contact the author.
 
 ---
 
-## 🚀 Quick Setup
+## 🚀 Package Installation
 
-### Prerequisites
+Bristol Gate Pipeline is organized as a proper Python package for easy installation and reuse.
+
+### **Package Structure**
+
+The `bristol-gate-pipeline` package contains:
+- **Core pipeline modules**: Data collection, aggregation, feature engineering
+- **Data fetchers**: Yahoo Finance, FRED, EIA, Baker Hughes, FINRA, S&P 500, USDA
+- **Utilities**: Web scraping, file processing, transformations
+- **All dependencies**: Automatically installs pandas, duckdb, yfinance, etc.
+
+### **Installation Options**
 
 ```bash
-# Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Development installation (recommended - allows package modifications)
+pip install -e .
 
-# Install dependencies
-pip install -r requirements.txt
+# Or regular installation
+pip install .
 
-# Set up environment variables (add your API keys)
-cp .env.example .env
-# Edit .env with your FRED_API_KEY and EIA_TOKEN
+# Install with development tools
+pip install -e ".[dev]"
 ```
+
+### **Using the Package**
+
+```python
+# Import the pipeline modules
+from src_pipeline.pipelines.data_collection import DataCollectionPipeline
+from src_pipeline.core.config_manager import ConfigurationManager
+from src_pipeline.fetchers.fetch_yahoo import YahooFinanceFetcher
+
+# Use anywhere in your Python code
+config = ConfigurationManager.create_default()
+pipeline = DataCollectionPipeline(config)
+```
+
+**Scripts remain separate** and use the installed package:
+- Located in `scripts/` directory
+- Import from `src_pipeline` package
+- Can be run from any directory after package installation
+
+---
 
 ## 📋 Four-Step Pipeline
 
@@ -169,7 +225,7 @@ Create and set up your DuckDB database with all required tables.
 
 ```bash
 # Initialize database and load symbol definitions
-python setup_duckdb.py --load-symbols
+python scripts/setup_duckdb.py --load-symbols
 ```
 
 **What this does:**
@@ -185,15 +241,15 @@ Fetch data from all sources with intelligent incremental loading.
 
 ```bash
 # Incremental collection (recommended for daily use)
-python run_data_collection.py
+python scripts/run_data_collection.py
 
 # Full refresh (when needed)
-python run_data_collection.py --full-refresh
+python scripts/run_data_collection.py --full-refresh
 
 # 🆕 Source filtering for testing/development
-python run_data_collection.py --sources yahoo,fred,baker
-python run_data_collection.py --sources yahoo --incremental
-python run_data_collection.py --sources fred,eia --full-refresh
+python scripts/run_data_collection.py --sources yahoo,fred,baker
+python scripts/run_data_collection.py --sources yahoo --incremental
+python scripts/run_data_collection.py --sources fred,eia --full-refresh
 ```
 
 **What this does:**
@@ -211,13 +267,13 @@ Transform raw data into analysis-ready dataset with interpolation and aggregate 
 
 ```bash
 # Create interpolated and aggregated dataset
-python run_aggregate_series.py
+python scripts/run_aggregate_series.py
 
 # Custom date range
-python run_aggregate_series.py --start-date 2020-01-01
+python scripts/run_aggregate_series.py --start-date 2020-01-01
 
 # Test mode (skip saving)
-python run_aggregate_series.py --skip-save
+python scripts/run_aggregate_series.py --skip-save
 ```
 
 **What this does:**
@@ -234,16 +290,16 @@ Transform aggregated data into ML-ready features with comprehensive feature engi
 
 ```bash
 # Generate all features (basic + domain-specific)
-python run_features_pipeline.py
+python scripts/run_features_pipeline.py
 
 # Run from DuckDB with parallel processing (production)
-python run_features_pipeline.py --full --verbose
+python scripts/run_features_pipeline.py --full --verbose
 
 # Sequential processing for debugging
-python run_features_pipeline.py --sequential
+python scripts/run_features_pipeline.py --sequential
 
 # Skip domain features for faster processing
-python run_features_pipeline.py --no-domain-features
+python scripts/run_features_pipeline.py --no-domain-features
 ```
 
 **What this does:**
@@ -333,23 +389,23 @@ pip install -r requirements.txt
 cp env.example .env  # Edit with your API keys
 
 # Initialize database
-python setup_duckdb.py --load-symbols
+python scripts/setup_duckdb.py --load-symbols
 ```
 
 ### **📊 Daily/Regular Data Updates**
 
 ```bash
 # Quick update with all sources (recommended for production)
-python run_data_collection.py
+python scripts/run_data_collection.py
 
 # Or target specific sources for faster testing
-python run_data_collection.py --sources yahoo,fred
+python scripts/run_data_collection.py --sources yahoo,fred
 
 # Create enhanced dataset for analysis
-python run_aggregate_series.py
+python scripts/run_aggregate_series.py
 
 # Generate ML-ready features (500+ features)
-python run_features_pipeline.py
+python scripts/run_features_pipeline.py
 ```
 
 ### **🎯 Your Results**
@@ -396,13 +452,13 @@ The pipeline creates comprehensive features across multiple categories:
 ### Data Collection Options
 
 ```bash
-python run_data_collection.py --incremental    # Default: only new data
-python run_data_collection.py --full-refresh   # Reload all historical data
+python scripts/run_data_collection.py --incremental    # Default: only new data
+python scripts/run_data_collection.py --full-refresh   # Reload all historical data
 
 # 🆕 Source filtering for targeted collection
-python run_data_collection.py --sources yahoo,fred              # Only Yahoo & FRED
-python run_data_collection.py --sources baker,finra,sp500       # Only web scraped sources  
-python run_data_collection.py --sources eia,usda --full-refresh # Energy & agriculture refresh
+python scripts/run_data_collection.py --sources yahoo,fred              # Only Yahoo & FRED
+python scripts/run_data_collection.py --sources baker,finra,sp500       # Only web scraped sources  
+python scripts/run_data_collection.py --sources eia,usda --full-refresh # Energy & agriculture refresh
 
 # Available sources: yahoo, fred, eia, baker, finra, sp500, usda
 ```
@@ -410,9 +466,9 @@ python run_data_collection.py --sources eia,usda --full-refresh # Energy & agric
 ### Aggregate Series Options
 
 ```bash
-python run_aggregate_series.py --start-date 2010-01-01  # Custom date range
-python run_aggregate_series.py --method staged          # Use pandas pivot (debugging)
-python run_aggregate_series.py --skip-save              # Test mode, don't save
+python scripts/run_aggregate_series.py --start-date 2010-01-01  # Custom date range
+python scripts/run_aggregate_series.py --method staged          # Use pandas pivot (debugging)
+python scripts/run_aggregate_series.py --skip-save              # Test mode, don't save
 ```
 
 ## 🗂️ Organized Module Structure

@@ -1,84 +1,102 @@
-# Git
-.git
-.gitignore
-.gitattributes
+# Bristol Gate Docker Ignore
+# Optimize build context by excluding unnecessary files
 
-# Documentation
-README.md
-DEVELOPMENT.md
-*.md
-
-# Environment files (we'll copy template manually)
-.env
-.env.local
-.env.production
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-bristol_gate_env/
-
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+venv/
+.venv/
+env/
+.env
+# Allow env.example
+!env.example
+
+# Allow .env.docker
+!.env.docker
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
 
 # IDE
 .vscode/
 .idea/
-.cursor/
 *.swp
 *.swo
 *~
 
-# macOS
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
-
-# Windows
-Thumbs.db
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
 ehthumbs.db
-Desktop.ini
+Thumbs.db
 
-# Database files (will be created in container)
-*.duckdb
-*.duckdb.wal
+# Git
+.git/
+.gitignore
+.gitattributes
 
-# Data files (will be generated)
-data/bronze/**/*.parquet
-data/silver/**/*.parquet
-data/gold/**/*.parquet
+# Documentation
+README.md
+DOCKER.md
+docs/
+*.md
 
-# Logs
-*.log
+# Data files (these are mounted as volumes)
+bristol_gate.duckdb
+bristol_gate.duckdb.wal
+data/bronze/
+data/silver/
+data/gold/
 logs/
+downloads/
+
+# Test files
+test/
+tests/
+*test*.py
 
 # Temporary files
-temp/
-tmp/
 *.tmp
+*.temp
+.tmp/
 
-# Downloaded files
-downloads/
-*.xlsx
-*.xlsb
-*.xls
-
-# Development artifacts
-old/
-selenium_cache/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Docker files themselves
+# Docker
 Dockerfile*
 docker-compose*.yml
 .dockerignore 
