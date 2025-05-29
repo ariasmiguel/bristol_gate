@@ -1,0 +1,93 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bristol-gate-pipeline"
+version = "2.0.0"
+description = "Financial data pipeline engine with DuckDB and advanced feature engineering"
+readme = "README.md"
+license = {text = "CC-BY-NC-SA-4.0"}
+authors = [
+    {name = "Miguel Arias", email = "miguel@hashservices.io"}
+]
+keywords = [
+    "financial-data", 
+    "economic-data", 
+    "duckdb", 
+    "feature-engineering", 
+    "data-pipeline",
+    "etl"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "pandas>=2.0.0",
+    "duckdb>=0.8.0",
+    "polars>=0.20.0",
+    "pyarrow>=12.0.0",
+    "yfinance>=0.2.0",
+    "fredapi>=0.5.0",
+    "requests>=2.31.0",
+    "selenium>=4.15.0",
+    "openpyxl>=3.1.0",
+    "xlrd>=2.0.0",
+    "python-calamine>=0.3.0",
+    "python-dotenv>=1.0.0",
+    "scipy>=1.11.0",
+    "numpy>=1.24.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "flake8>=6.0.0",
+    "mypy>=1.5.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ariasmiguel/bristol_gate"
+Repository = "https://github.com/ariasmiguel/bristol_gate"
+Issues = "https://github.com/ariasmiguel/bristol_gate/issues"
+Documentation = "https://github.com/ariasmiguel/bristol_gate/blob/main/README.md"
+
+[tool.setuptools.packages.find]
+include = ["src_pipeline*"]
+
+[tool.setuptools.package-data]
+"src_pipeline" = ["*.sql", "*.csv", "*.yaml", "*.yml"]
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line-length = 100
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true 

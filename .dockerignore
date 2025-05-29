@@ -1,0 +1,84 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+DEVELOPMENT.md
+*.md
+
+# Environment files (we'll copy template manually)
+.env
+.env.local
+.env.production
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+bristol_gate_env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# IDE
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Database files (will be created in container)
+*.duckdb
+*.duckdb.wal
+
+# Data files (will be generated)
+data/bronze/**/*.parquet
+data/silver/**/*.parquet
+data/gold/**/*.parquet
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Downloaded files
+downloads/
+*.xlsx
+*.xlsb
+*.xls
+
+# Development artifacts
+old/
+selenium_cache/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore 

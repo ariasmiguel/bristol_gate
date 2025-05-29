@@ -1,0 +1,120 @@
+version: '3.8'
+
+services:
+  # Main Bristol Gate Application
+  bristol-gate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bristol-gate-app
+    environment:
+      - FRED_API_KEY=${FRED_API_KEY}
+      - EIA_TOKEN=${EIA_TOKEN}
+      - DB_PATH=/app/data/bristol_gate.duckdb
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - CHROME_DRIVER_PATH=/usr/bin/chromedriver
+    volumes:
+      # Persist data and database
+      - bristol_data:/app/data
+      - bristol_logs:/app/logs
+      # Mount config if you want to override
+      - ./.env:/app/.env:ro
+    networks:
+      - bristol-network
+    depends_on:
+      - setup
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Initializing Bristol Gate Pipeline...' &&
+        python setup_duckdb.py --load-symbols &&
+        echo 'Starting data collection...' &&
+        python run_data_collection.py --sources yahoo,fred &&
+        echo 'Creating aggregated dataset...' &&
+        python run_aggregate_series.py &&
+        echo 'Generating features...' &&
+        python run_features_pipeline.py &&
+        echo 'Pipeline complete! Keeping container alive...' &&
+        tail -f /dev/null
+      "
+
+  # Setup service to initialize the database
+  setup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bristol-gate-setup
+    environment:
+      - DB_PATH=/app/data/bristol_gate.duckdb
+    volumes:
+      - bristol_data:/app/data
+    networks:
+      - bristol-network
+    command: >
+      sh -c "
+        echo 'Setting up Bristol Gate database...' &&
+        python setup_duckdb.py --load-symbols &&
+        echo 'Database setup complete!'
+      "
+    restart: "no"
+
+  # Optional: Web interface for monitoring (future enhancement)
+  # bristol-web:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.web
+  #   container_name: bristol-gate-web
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - DB_PATH=/app/data/bristol_gate.duckdb
+  #   volumes:
+  #     - bristol_data:/app/data:ro
+  #   networks:
+  #     - bristol-network
+  #   depends_on:
+  #     - bristol-gate
+
+  # Cron service for scheduled data updates
+  bristol-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bristol-gate-scheduler
+    environment:
+      - FRED_API_KEY=${FRED_API_KEY}
+      - EIA_TOKEN=${EIA_TOKEN}
+      - DB_PATH=/app/data/bristol_gate.duckdb
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - bristol_data:/app/data
+      - bristol_logs:/app/logs
+      - ./.env:/app/.env:ro
+    networks:
+      - bristol-network
+    depends_on:
+      - bristol-gate
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Setting up scheduler for daily updates...' &&
+        echo '0 6 * * * cd /app && python run_data_collection.py' | crontab - &&
+        echo '30 6 * * * cd /app && python run_aggregate_series.py' | crontab - &&
+        echo '0 7 * * * cd /app && python run_features_pipeline.py' | crontab - &&
+        echo 'Scheduler configured. Starting cron...' &&
+        cron -f
+      "
+
+volumes:
+  bristol_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  bristol_logs:
+    driver: local
+
+networks:
+  bristol-network:
+    driver: bridge 

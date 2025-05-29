@@ -296,6 +296,29 @@ Running this pipeline gives you a **comprehensive financial dataset** ready for 
  'GDP_YoY_to_DGS1', 'CPI_Smooth', 'PAYEMS_normalized', ...]
 ```
 
+## 🐳 Docker Support
+
+Bristol Gate now supports Docker for easy deployment and consistent environments:
+
+```bash
+# Quick start with Docker Compose
+git clone https://github.com/ariasmiguel/bristol_gate.git
+cd bristol_gate
+cp env.example .env  # Add your API keys
+docker-compose up
+```
+
+**Features:**
+- 🚀 **One-command deployment** with automated pipeline execution
+- 📊 **Scheduled daily updates** via built-in cron jobs  
+- 🔒 **Production-ready** with multi-stage builds and security best practices
+- 📈 **Monitoring & logging** with persistent volumes
+- 🌐 **Multi-platform** support (AMD64/ARM64)
+
+See [DOCKER.md](DOCKER.md) for complete documentation.
+
+---
+
 ## 🎁 Complete Workflow
 
 ### **🚀 First Time Setup** 
@@ -392,185 +415,41 @@ python run_aggregate_series.py --method staged          # Use pandas pivot (debu
 python run_aggregate_series.py --skip-save              # Test mode, don't save
 ```
 
-### Feature Pipeline Options
+## 🗂️ Organized Module Structure
 
-```bash
-python run_features_pipeline.py --full                  # Run complete pipeline from DuckDB
-python run_features_pipeline.py --silver                # Load from silver layer (faster)
-python run_features_pipeline.py --sequential            # Sequential processing (debugging)
-python run_features_pipeline.py --workers 8             # Tune parallel workers
-python run_features_pipeline.py --no-domain-features    # Skip domain features
-python run_features_pipeline.py --verbose               # Detailed timing information
-python run_features_pipeline.py --no-timestamp          # Exact output path
+Bristol Gate features a clean, organized codebase with logical module separation:
+
+```
+src_pipeline/
+├── pipelines/          # Main orchestrator modules
+│   ├── data_collection.py      # Data collection pipeline
+│   ├── aggregate_series.py     # Data aggregation
+│   └── unified_pipeline.py     # Feature engineering pipeline
+├── core/               # Core infrastructure
+│   ├── base_fetcher.py         # Common fetcher base class
+│   ├── utils.py                # Core utilities & database ops
+│   ├── duckdb_functions.py     # DuckDB operations
+│   ├── date_utils.py           # Date/time utilities
+│   └── symbol_processor.py     # Symbol standardization
+├── fetchers/           # Data source fetchers  
+│   ├── fetch_yahoo.py          # Yahoo Finance (API)
+│   ├── fetch_fred.py           # Federal Reserve (API)
+│   ├── fetch_eia.py            # Energy Information Admin (API)
+│   └── fetch_*.py              # Web scraping fetchers
+├── utils/              # Specialized utilities
+│   ├── web_scraping_utils.py   # Selenium operations
+│   ├── excel_processing_utils.py # Excel file handling
+│   └── transform_utils.py      # Data transformations
+└── features/           # Feature engineering
+    ├── feature_utils.py        # Feature calculation functions
+    └── interpolate_data.py     # Data interpolation
 ```
 
-### Database Setup Options
-
-```bash
-python setup_duckdb.py                          # Database only
-python setup_duckdb.py --load-symbols           # Database + symbols
-python setup_duckdb.py --symbols-file custom.csv  # Custom symbols file
-```
-
-## 🎨 Medallion Architecture
-
-This pipeline follows the **medallion architecture**:
-
-- **🥉 Bronze Layer** (`data/bronze/`): Raw data from sources, stored as Parquet
-- **🥈 Silver Layer** (`data/silver/`): Cleaned, interpolated, and enhanced data
-  - Base aggregated data (100+ series)
-  - Featured data (500+ engineered features)
-- **🥇 Gold Layer**: Ready for your specific analytics and ML models
-
-## 🏗️ **Refactored Architecture** 
-
-**The pipeline has been completely refactored with a modular, maintainable design:**
-
-### **Core Utility Classes**
-
-- **`BaseDataFetcher`**: Common base class for all data sources
-  - Standardized logging, error handling, and data validation
-  - Consistent API rate limiting and retry logic
-  - Unified data format standardization
-
-- **`SymbolProcessor`**: Centralized symbol management
-  - Eliminates code duplication across 7 fetch modules
-  - Standardized symbol preparation and validation
-  - Consistent column naming and data structure
-
-- **`DateUtils`**: Comprehensive date/time utilities
-  - Standardized timestamp generation for file naming
-  - Consistent datetime formatting across all modules
-  - Quarter-end date calculations and business day logic
-
-### **Specialized Utility Classes**
-
-- **`WebScrapingUtils`**: Selenium-based web scraping
-  - Reusable browser management and page interaction
-  - Standardized wait conditions and error handling
-  - Used by Baker Hughes, FINRA, and S&P 500 fetchers
-
-- **`FileDownloadUtils`**: File download management
-  - Intelligent download directory handling
-  - Wait for completion logic with timeout protection
-  - Cleanup and file validation
-
-- **`ExcelProcessingUtils`**: Robust Excel file handling
-  - Multiple engine fallbacks (openpyxl → xlrd → calamine)
-  - Automatic date column detection and conversion
-  - Support for both .xlsx and .xlsb formats
-
-- **`DataTransformUtils`**: Data transformation operations
-  - Standardized melt operations with configurable parameters
-  - Consistent data reshaping patterns
-  - Reusable transformation logic
-
-### **Refactoring Benefits Achieved**
-
-✅ **Eliminated 200-300 lines of duplicated code**  
-✅ **Removed exact function duplicates** (validate_dataframe)  
-✅ **Standardized error handling** across all modules  
-✅ **Consistent logging format** and data transformation patterns  
-✅ **Better testability** through shared utility classes  
-✅ **Easier maintenance** - changes in one place affect all users  
-✅ **Faster development** - new data sources use existing utilities  
-✅ **Improved reliability** - centralized, battle-tested functionality  
-
-### **Integration Success**
-
-**All major pipeline modules now use the refactored utilities:**
-- `data_collection.py` - Uses SymbolProcessor for standardized symbol handling
-- `aggregate_series.py` - Uses DateUtils for consistent timestamp generation  
-- All fetch modules (`fetch_*.py`) - Inherit from BaseDataFetcher
-- Main scripts - Use DateUtils for consistent datetime formatting
-
-**Testing Results**: 100% success rate across all data sources with zero errors 🎉
-
-## 💡 Key Benefits
-
-✅ **No intermediate CSV files** - Everything stored efficiently in Parquet
-
-✅ **Incremental loading** - Only fetch new data, respecting API limits
-
-✅ **Column-oriented storage** - 3-5x smaller files, 10-50x faster loading
-
-✅ **Comprehensive feature engineering** - 500+ ML-ready features automatically generated
-
-✅ **Parallel processing** - Multi-threaded feature calculation for speed
-
-✅ **Audit trail** - Timestamped files with complete metadata tracking
-
-✅ **Local processing** - No cloud dependencies, runs entirely on your machine
-
-✅ **Automatic interpolation** - Daily frequency with smart gap filling
-
-✅ **Domain expertise built-in** - Economic and financial features from research
-
-### **🆕 Refactoring Benefits**
-
-✅ **Modular architecture** - Reusable utility classes eliminate code duplication
-
-✅ **Source filtering** - Test and develop with specific data sources using `--sources`
-
-✅ **Zero code duplication** - Eliminated 200-300 lines of repeated code
-
-✅ **Standardized error handling** - Consistent logging and failure recovery
-
-✅ **Enhanced maintainability** - Centralized utilities make updates easier
-
-✅ **Better testing** - Modular design enables targeted testing and debugging
-
-✅ **Robust web scraping** - Selenium-based utilities with intelligent wait conditions
-
-✅ **Multi-format Excel support** - Fallback engines handle .xlsx, .xlsb files reliably
-
-✅ **Consistent timestamps** - Standardized file naming and audit trails
-
-## 📈 Performance
-
-**Typical pipeline performance on modern hardware:**
-
-- **Data Collection**: 2-5 minutes (incremental)
-- **Aggregation**: 30-60 seconds for 25+ years of data
-- **Feature Generation**: 1-3 minutes for 500+ features (parallel)
-- **Final Dataset**: ~50-100 MB Parquet file
-
-## 🔄 Automation
-
-For production use, create a scheduled workflow:
-
-```bash
-#!/bin/bash
-# daily_update.sh
-
-# Update data
-python run_data_collection.py
-
-# Create features if new data was collected
-if [ $? -eq 0 ]; then
-    python run_aggregate_series.py
-    python run_features_pipeline.py --verbose
-    echo "Pipeline completed: $(date)"
-fi
-```
+**Benefits:**
+- 🎯 **Clear separation of concerns** - Each module has a specific purpose
+- 📦 **Easy imports** - `from src_pipeline.pipelines import DataCollectionPipeline`  
+- 🔧 **Maintainable** - Related functionality grouped together
+- 🧪 **Testable** - Isolated modules for targeted testing
+- 📚 **Self-documenting** - Structure shows system architecture
 
 ---
-
-**Ready to start?** Run these four commands:
-
-```bash
-python setup_duckdb.py --load-symbols
-python run_data_collection.py  
-python run_aggregate_series.py
-python run_features_pipeline.py
-```
-
-🎉 **Done!** Your ML-ready dataset with 500+ features is in `data/silver/featured_data.parquet`
-
-**Load your data:**
-```python
-import pandas as pd
-df = pd.read_parquet('data/silver/featured_data.parquet')
-print(f"Dataset shape: {df.shape}")
-print(f"Date range: {df.index.min()} to {df.index.max()}")
-```
