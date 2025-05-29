@@ -124,6 +124,24 @@ python -c "import duckdb; con = duckdb.connect('bristol_gate.duckdb'); print('Sy
 - **Use verbose mode**: Add `--verbose` to see detailed progress
 - **Issues on GitHub**: [Report bugs or ask questions](https://github.com/ariasmiguel/bristol_gate/issues)
 
+## 📄 **License**
+
+**Bristol Gate is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.**
+
+✅ **You CAN:**
+- Use for personal projects and research
+- Modify and adapt the code
+- Share with others (with attribution)
+- Use for academic research and education
+
+❌ **You CANNOT:**
+- Use for commercial purposes or profit
+- Sell the software or derivatives
+- Use in commercial products/services
+- Use for commercial consulting or research
+
+For commercial licensing inquiries, please contact the author.
+
 ---
 
 ## 🚀 Quick Setup
@@ -278,7 +296,7 @@ Running this pipeline gives you a **comprehensive financial dataset** ready for 
  'GDP_YoY_to_DGS1', 'CPI_Smooth', 'PAYEMS_normalized', ...]
 ```
 
-## �� Complete Workflow
+## 🎁 Complete Workflow
 
 ### **🚀 First Time Setup** 
 *(See [Getting Started](#-getting-started---quick-setup) above for detailed instructions)*
