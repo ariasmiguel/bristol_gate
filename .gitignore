@@ -1,0 +1,102 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+bristol_gate_env/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# DuckDB databases
+*.duckdb
+*.duckdb.wal
+
+# Data files (keep structure but not actual data)
+data/bronze/**/*.parquet
+data/silver/**/*.parquet
+data/gold/**/*.parquet
+
+# But keep the directory structure and sample files
+!data/bronze/.gitkeep
+!data/silver/.gitkeep
+!data/gold/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Selenium browser cache
+selenium_cache/
+
+# Downloaded files from web scraping
+downloads/
+*.xlsx
+*.xlsb
+*.xls
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# pytest cache
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json 
