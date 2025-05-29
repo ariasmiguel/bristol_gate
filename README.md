@@ -579,7 +579,7 @@ print(f"Date range: {df.index.min()} to {df.index.max()}")
 
 ## 🏆 **Refactoring Success Story**
 
-**This codebase was successfully refactored in 2024 to eliminate code duplication and improve maintainability.**
+**This codebase was successfully refactored in 2025 to eliminate code duplication and improve maintainability.**
 
 ### **Problem Statement**
 - **Duplicated functions**: `validate_dataframe()` appeared exactly twice in utils.py
