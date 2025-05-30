@@ -6,8 +6,9 @@ scipy>=1.10.0 # Added for signal processing (e.g., savgol_filter)
 pyarrow>=14.0.0  # For parquet file support
 
 # Web Scraping
-selenium>=4.10.0  # Used for browser automation in baker.py
+selenium>=4.15.0  # Used for browser automation in baker.py and occ.py
 selenium-stealth>=1.0.6  # Anti-detection for Selenium
+webdriver-manager>=4.0.0  # Automatic Chrome driver management for OCC fetcher
 requests>=2.31.0  # For HTTP requests
 
 # API Clients

@@ -19,6 +19,7 @@ from ..fetchers.fetch_baker import fetch_baker
 from ..fetchers.fetch_finra import fetch_finra
 from ..fetchers.fetch_sp500 import fetch_sp500
 from ..fetchers.fetch_usda import fetch_usda
+from ..fetchers.fetch_occ import fetch_occ
 
 # Import utilities
 from ..core.utils import (
@@ -341,6 +342,34 @@ class DataCollectionPipeline:
             except Exception as e:
                 logger.error(f"❌ Error collecting USDA data: {str(e)}")
                 raise Exception(f"USDA collection failed: {str(e)}")
+        
+        # OCC data
+        logger.info("=" * 50)
+        logger.info("COLLECTING OCC DATA")
+        logger.info("=" * 50)
+        
+        if not self._is_source_allowed('occ'):
+            logger.info("🚫 OCC data collection SKIPPED (not in allowed sources)")
+        else:
+            try:
+                occ_data = fetch_occ()
+                
+                if not self.validator.validate_dataframe(occ_data, "occ"):
+                    raise Exception("OCC data validation failed")
+                
+                results['occ'] = occ_data
+                
+                if not self.pipeline_manager.store_to_staging_table(
+                    occ_data, "stg_occ", "occ", incremental=self.incremental
+                ):
+                    raise Exception("Failed to store OCC data")
+                
+                total_symbols = occ_data['symbol'].nunique() if not occ_data.empty else 0
+                self._log_collection_stats(occ_data, "occ", total_symbols)
+                
+            except Exception as e:
+                logger.error(f"❌ Error collecting OCC data: {str(e)}")
+                raise Exception(f"OCC collection failed: {str(e)}")
         
         return results
 

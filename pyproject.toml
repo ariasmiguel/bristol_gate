@@ -47,6 +47,7 @@ dependencies = [
     "requests>=2.31.0",
     "selenium>=4.15.0",
     "selenium-stealth>=1.0.6",
+    "webdriver-manager>=4.0.0",
     "openpyxl>=3.1.2",
     "xlrd>=2.0.0",
     "pyxlsb>=1.0.10",

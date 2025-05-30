@@ -56,6 +56,12 @@ SOURCE_SCHEMAS = {
         'description': 'USDA agricultural data',
         'date_column': 'date',
         'identifier_column': 'symbol'
+    },
+    'occ': {
+        'required_columns': ['date', 'symbol', 'metric', 'value'],
+        'description': 'OCC options and futures volume data',
+        'date_column': 'date',
+        'identifier_column': 'symbol'
     }
 }
 

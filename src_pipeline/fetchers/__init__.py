@@ -11,6 +11,7 @@ from .fetch_baker import fetch_baker
 from .fetch_finra import fetch_finra
 from .fetch_sp500 import fetch_sp500
 from .fetch_usda import fetch_usda
+from .fetch_occ import fetch_occ
 
 __all__ = [
     'fetch_yahoo',
@@ -19,5 +20,6 @@ __all__ = [
     'fetch_baker',
     'fetch_finra',
     'fetch_sp500',
-    'fetch_usda'
+    'fetch_usda',
+    'fetch_occ'
 ] 

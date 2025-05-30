@@ -106,6 +106,21 @@ CREATE TABLE IF NOT EXISTS stg_usda
 );
 
 -- =====================================================
+-- OCC (Options Clearing Corporation) Staging Table
+-- Schema: date, symbol, metric, value (standard format)
+-- Note: Contains daily options and futures volume data
+-- Metrics include: Options_Equity_Volume, Options_Index_Volume, Options_Debt_Volume,
+--                  Futures_Total_Volume, Total_Volume, Futures_Equity_Volume, Futures_Index_Volume
+-- =====================================================
+CREATE TABLE IF NOT EXISTS stg_occ
+(
+    date DATE,
+    symbol VARCHAR,
+    metric VARCHAR,
+    value DOUBLE
+);
+
+-- =====================================================
 -- Verify table creation
 -- =====================================================
 SHOW TABLES;
@@ -121,6 +136,7 @@ DESCRIBE stg_baker;
 DESCRIBE stg_finra;
 DESCRIBE stg_sp500;
 DESCRIBE stg_usda;
+DESCRIBE stg_occ;
 
 -- =====================================================
 -- Sanity check - count rows in symbols table
