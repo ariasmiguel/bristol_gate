@@ -174,7 +174,8 @@ class DuckDBInitializer:
                 'string.symbol': 'symbol',
                 'string.source': 'source', 
                 'string.description': 'description',
-                'string.label.y': 'unit'
+                'string.label.y': 'unit',
+                'float.expense.ratio': 'expense_ratio'
             }
             
             # Check if required columns exist
@@ -187,9 +188,9 @@ class DuckDBInitializer:
             df_clean = df.rename(columns=column_mapping)
             logger.info("Successfully renamed columns")
             
-            # Step 4: Select only the columns we need
+            # Step 4: Select only the columns we need (including expense_ratio)
             logger.info("Step 3: Selecting required columns...")
-            df_clean = df_clean[['symbol', 'source', 'description', 'unit']]
+            df_clean = df_clean[['symbol', 'source', 'description', 'unit', 'expense_ratio']]
             
             # Step 5: Clean up any null values
             logger.info("Step 4: Cleaning null values...")
@@ -268,7 +269,7 @@ class DuckDBInitializer:
             
             expected_tables = [
                 'symbols', 'stg_fred', 'stg_yahoo', 'stg_eia', 
-                'stg_baker', 'stg_finra', 'stg_sp500', 'stg_usda'
+                'stg_baker', 'stg_finra', 'stg_sp500', 'stg_usda', 'stg_occ', 'featured_data'
             ]
             
             missing_tables = []

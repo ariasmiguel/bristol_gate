@@ -15,6 +15,7 @@ import os
 import time
 import calendar
 from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from typing import Optional, List, Dict, Any
 from io import StringIO
 from selenium import webdriver
@@ -329,7 +330,7 @@ class OCCDailyDataFetcher(BaseDataFetcher):
         return pd.DataFrame(long_data)
 
     def fetch_batch_without_saving(self, start_year: int, end_year: Optional[int] = None, 
-                                  max_months: int = 2) -> pd.DataFrame:
+                                  max_months: Optional[int] = 2) -> pd.DataFrame:
         """
         Fetch OCC data without saving to file (for pipeline integration).
         Includes smart date range logic to avoid fetching future months.
@@ -337,7 +338,7 @@ class OCCDailyDataFetcher(BaseDataFetcher):
         Args:
             start_year: Starting year for data extraction
             end_year: Ending year (optional, defaults to start_year)
-            max_months: Maximum number of months to fetch (for testing/incremental)
+            max_months: Maximum number of months to fetch (None for unlimited, default 2 for incremental)
             
         Returns:
             DataFrame in standard long format without saving files
@@ -350,7 +351,8 @@ class OCCDailyDataFetcher(BaseDataFetcher):
         current_year = current_date.year
         current_month = current_date.month
         
-        self.logger.info(f"Fetching OCC data from {start_year} to {end_year} (pipeline mode, max {max_months} months)")
+        max_months_str = "unlimited" if max_months is None else str(max_months)
+        self.logger.info(f"Fetching OCC data from {start_year} to {end_year} (pipeline mode, max {max_months_str} months)")
         
         all_data = []
         months_fetched = 0
@@ -370,20 +372,27 @@ class OCCDailyDataFetcher(BaseDataFetcher):
                 self.logger.info(f"Future year {year}: skipping")
                 continue
             
-            # Apply max_months limit for testing
-            if max_months and months_fetched >= max_months:
+            # Apply max_months limit if specified
+            if max_months is not None and months_fetched >= max_months:
                 self.logger.info(f"Reached max_months limit ({max_months}), stopping")
                 break
                 
-            # Fetch only recent months for incremental updates
-            recent_months = month_range[-min(len(month_range), max_months - months_fetched):] if max_months else month_range
+            # Determine which months to fetch
+            if max_months is None:
+                # Unlimited: fetch all months in the year
+                target_months = month_range
+            else:
+                # Limited: fetch only recent months up to the limit
+                remaining_months = max_months - months_fetched
+                target_months = month_range[-min(len(month_range), remaining_months):] if remaining_months > 0 else []
             
-            for month in recent_months:
-                if max_months and months_fetched >= max_months:
+            for month in target_months:
+                if max_months is not None and months_fetched >= max_months:
                     break
                     
                 month_name = calendar.month_name[month]
-                self.logger.info(f"Fetching {month_name} {year} ({months_fetched + 1}/{max_months if max_months else 'unlimited'})")
+                progress_str = f"({months_fetched + 1}/{max_months})" if max_months else f"({months_fetched + 1})"
+                self.logger.info(f"Fetching {month_name} {year} {progress_str}")
                 
                 month_data = self.extract_month_data_single(year, month)
                 if month_data:
@@ -397,10 +406,11 @@ class OCCDailyDataFetcher(BaseDataFetcher):
                 
         if all_data:
             combined_df = pd.concat(all_data, ignore_index=True)
-            self.logger.info(f"Successfully fetched {len(combined_df)} records from {months_fetched} months")
+            mode_str = "HISTORICAL" if max_months is None else "INCREMENTAL"
+            self.logger.info(f"✅ {mode_str} fetch complete: {len(combined_df)} records from {months_fetched} months")
             return combined_df
         else:
-            self.logger.warning("No data extracted")
+            self.logger.warning("⚠️ No data extracted")
             return pd.DataFrame()
 
     def extract_month_data_single(self, year: int, month: int) -> Optional[Dict]:
@@ -444,18 +454,239 @@ class OCCDailyDataFetcher(BaseDataFetcher):
     def fetch_batch(self, symbols_df: pd.DataFrame = None) -> pd.DataFrame:
         """
         Implementation of abstract method for OCC fetcher.
-        For OCC, we extract recent months regardless of symbols_df since
-        OCC data doesn't use the symbols table (it's a direct source).
+        Intelligently determines whether to do full historical fetch or incremental update.
         
         Args:
             symbols_df: Not used for OCC (OCC is a direct source)
             
         Returns:
-            DataFrame with recent OCC data in standard format (max 2 months)
+            DataFrame with OCC data in standard format
         """
-        # For OCC, we extract recent months for incremental updates
+        # Check if this should be a full historical fetch or incremental update
+        if self._should_do_full_historical_fetch():
+            self.logger.info("🔄 Performing FULL HISTORICAL fetch (January 2008 to current)")
+            return self.fetch_full_historical_data()
+        else:
+            self.logger.info("📈 Performing INCREMENTAL fetch (current month only)")
+            return self.fetch_incremental_data()
+    
+    def _should_do_full_historical_fetch(self) -> bool:
+        """
+        Determine if we should do a full historical fetch or incremental update.
+        
+        Logic:
+        - Check DuckDB stg_occ table directly for existing data
+        - If no data exists, do full fetch
+        - If data exists, analyze date coverage to find missing year-month combinations
+        - If significant gaps exist (missing multiple months), do full fetch
+        - If only recent months are missing, do incremental fetch
+        
+        Returns:
+            True if full historical fetch is needed, False for incremental
+        """
+        try:
+            import duckdb
+            import pandas as pd
+            from datetime import datetime
+            from dateutil.relativedelta import relativedelta
+            
+            # Connect to DuckDB and check existing data
+            try:
+                con = duckdb.connect('bristol_gate.duckdb', read_only=True)
+                
+                # Check if stg_occ table exists and has data
+                try:
+                    result = con.execute("SELECT COUNT(*) FROM stg_occ").fetchone()
+                    record_count = result[0] if result else 0
+                    
+                    if record_count == 0:
+                        self.logger.info("💡 No existing OCC data in DuckDB - will do full historical fetch")
+                        con.close()
+                        return True
+                    
+                    # Get existing data coverage
+                    existing_data = con.execute(
+                        "SELECT date FROM stg_occ WHERE symbol = 'OCC'"
+                    ).fetchdf()
+                    
+                    con.close()
+                    
+                    if len(existing_data) == 0:
+                        self.logger.info("💡 No OCC records found in DuckDB - will do full historical fetch")
+                        return True
+                    
+                    # Analyze date coverage
+                    existing_data['date'] = pd.to_datetime(existing_data['date'])
+                    existing_months = set(existing_data['date'].dt.to_period('M').astype(str))
+                    
+                    # Generate expected year-month combinations from 2008-01 to current month
+                    start_date = datetime(2008, 1, 1)  # OCC data starts around 2008
+                    current_date = datetime.now()
+                    
+                    expected_months = set()
+                    current_period = start_date
+                    while current_period <= current_date:
+                        expected_months.add(current_period.strftime('%Y-%m'))
+                        current_period += relativedelta(months=1)
+                    
+                    # Find missing months
+                    missing_months = expected_months - existing_months
+                    missing_count = len(missing_months)
+                    total_expected = len(expected_months)
+                    
+                    self.logger.info(f"📊 DuckDB data coverage analysis:")
+                    self.logger.info(f"   - Total records: {len(existing_data)}")
+                    self.logger.info(f"   - Expected months: {total_expected} (2008-01 to {current_date.strftime('%Y-%m')})")
+                    self.logger.info(f"   - Existing months: {len(existing_months)}")
+                    self.logger.info(f"   - Missing months: {missing_count}")
+                    
+                    # Decision logic
+                    if missing_count == 0:
+                        self.logger.info("✅ Complete data coverage - will do incremental fetch")
+                        return False
+                    elif missing_count == 1 and current_date.strftime('%Y-%m') in missing_months:
+                        self.logger.info("📈 Only current month missing - will do incremental fetch")
+                        return False
+                    elif missing_count <= 3:
+                        self.logger.info(f"⚠️ Few months missing ({missing_count}) - will do incremental fetch")
+                        # For small gaps, incremental fetch will catch up
+                        return False
+                    else:
+                        # Significant gaps - need full historical fetch
+                        self.logger.info(f"🔄 Significant gaps detected ({missing_count} months missing) - will do full historical fetch")
+                        if missing_count <= 10:  # Show missing months if not too many
+                            sorted_missing = sorted(list(missing_months))
+                            self.logger.info(f"   Missing: {', '.join(sorted_missing)}")
+                        return True
+                        
+                except Exception as table_error:
+                    # Table doesn't exist or is empty
+                    self.logger.info(f"💡 DuckDB stg_occ table not accessible ({table_error}) - will do full historical fetch")
+                    try:
+                        con.close()
+                    except:
+                        pass
+                    return True
+                    
+            except Exception as db_error:
+                self.logger.warning(f"⚠️ Could not access DuckDB: {db_error} - defaulting to full fetch")
+                return True
+                
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error checking existing data: {e} - defaulting to full fetch")
+            return True
+    
+    def fetch_full_historical_data(self) -> pd.DataFrame:
+        """
+        Fetch full historical data from January 2008 to current date.
+        
+        Returns:
+            DataFrame with complete historical OCC data
+        """
         current_year = datetime.now().year
-        return self.fetch_batch_without_saving(current_year, current_year, max_months=2)
+        start_year = 2008  # OCC data availability starts around 2008
+        
+        self.logger.info(f"🔄 Fetching FULL HISTORICAL OCC data: {start_year} to {current_year}")
+        self.logger.info(f"📅 This will fetch approximately {(current_year - start_year + 1) * 12} months of data")
+        
+        # Use the existing fetch_batch_without_saving but without month limits
+        return self.fetch_batch_without_saving(start_year, current_year, max_months=None)
+    
+    def fetch_incremental_data(self) -> pd.DataFrame:
+        """
+        Fetch incremental data (missing recent months) for regular updates.
+        Intelligently determines which recent months are missing and fetches them.
+        
+        Returns:
+            DataFrame with missing recent month OCC data
+        """
+        try:
+            import glob
+            
+            # Determine what months we need to fetch
+            missing_months = self._get_missing_recent_months()
+            
+            if not missing_months:
+                self.logger.info("✅ No missing recent months - data is up to date")
+                return pd.DataFrame()
+            
+            self.logger.info(f"📈 Fetching INCREMENTAL OCC data for {len(missing_months)} missing months: {', '.join(missing_months)}")
+            
+            # Fetch the missing months
+            all_data = []
+            for year_month in missing_months:
+                year, month = map(int, year_month.split('-'))
+                month_name = calendar.month_name[month]
+                
+                self.logger.info(f"Fetching missing month: {month_name} {year}")
+                month_data = self.extract_month_data_single(year, month)
+                if month_data:
+                    long_format_data = self.convert_to_long_format([month_data])
+                    all_data.append(long_format_data)
+                
+                # Small delay between months
+                time.sleep(1.0)
+            
+            if all_data:
+                combined_df = pd.concat(all_data, ignore_index=True)
+                self.logger.info(f"✅ INCREMENTAL fetch complete: {len(combined_df)} records from {len(missing_months)} months")
+                return combined_df
+            else:
+                self.logger.warning("⚠️ No incremental data extracted")
+                return pd.DataFrame()
+                
+        except Exception as e:
+            self.logger.error(f"❌ Error in incremental fetch: {e}")
+            # Fallback to simple current month fetch
+            current_year = datetime.now().year
+            return self.fetch_batch_without_saving(current_year, current_year, max_months=1)
+    
+    def _get_missing_recent_months(self, lookback_months: int = 3) -> List[str]:
+        """
+        Get list of missing recent months (last N months including current) from DuckDB.
+        
+        Args:
+            lookback_months: How many recent months to check (default 3)
+            
+        Returns:
+            List of missing year-month strings in YYYY-MM format
+        """
+        try:
+            import duckdb
+            
+            # Get existing data from DuckDB
+            existing_months = set()
+            
+            try:
+                con = duckdb.connect('bristol_gate.duckdb', read_only=True)
+                existing_data = con.execute(
+                    "SELECT date FROM stg_occ WHERE symbol = 'OCC'"
+                ).fetchdf()
+                con.close()
+                
+                if len(existing_data) > 0:
+                    existing_data['date'] = pd.to_datetime(existing_data['date'])
+                    existing_months = set(existing_data['date'].dt.to_period('M').astype(str))
+                    
+            except Exception as db_error:
+                self.logger.warning(f"⚠️ Could not access DuckDB for recent months check: {db_error}")
+            
+            # Generate recent months to check
+            current_date = datetime.now()
+            recent_months = []
+            
+            for i in range(lookback_months):
+                target_date = current_date - relativedelta(months=i)
+                recent_months.append(target_date.strftime('%Y-%m'))
+            
+            # Find missing recent months
+            missing_months = [month for month in recent_months if month not in existing_months]
+            return sorted(missing_months)  # Sort chronologically
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error determining missing months: {e}")
+            # Fallback to current month
+            return [datetime.now().strftime('%Y-%m')]
 
 
 def fetch_occ() -> pd.DataFrame:
@@ -463,15 +694,14 @@ def fetch_occ() -> pd.DataFrame:
     Fetch OCC daily volume data using the main pipeline interface.
     
     This function provides the standard interface for the data collection pipeline.
-    Fetches the most recent 2 months of data for incremental updates.
+    Intelligently determines whether to do full historical fetch (2008-current) or 
+    incremental update (current month only) based on existing data.
     
     Returns:
         DataFrame in standard long format with columns: date, symbol, metric, value
     """
     fetcher = OCCDailyDataFetcher()
-    current_year = datetime.now().year
-    # Fetch current year with max 2 months for incremental updates
-    return fetcher.fetch_batch_without_saving(current_year, current_year, max_months=2)
+    return fetcher.fetch_batch()
 
 
 if __name__ == "__main__":

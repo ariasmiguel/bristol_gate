@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS symbols
     symbol VARCHAR,
     source VARCHAR,
     description VARCHAR,
-    unit VARCHAR
+    unit VARCHAR,
+    expense_ratio DOUBLE
 );
 
 -- =====================================================
@@ -121,6 +122,20 @@ CREATE TABLE IF NOT EXISTS stg_occ
 );
 
 -- =====================================================
+-- Featured Data Table
+-- Schema: date, symbol, value (final standardized format)
+-- Note: Contains processed and featured data ready for ML/analysis
+-- This table stores the output of the feature engineering pipeline
+-- in a consistent long format for easy querying and analysis
+-- =====================================================
+CREATE TABLE IF NOT EXISTS featured_data
+(
+    date DATE,
+    symbol VARCHAR,
+    value DOUBLE
+);
+
+-- =====================================================
 -- Verify table creation
 -- =====================================================
 SHOW TABLES;
@@ -137,6 +152,7 @@ DESCRIBE stg_finra;
 DESCRIBE stg_sp500;
 DESCRIBE stg_usda;
 DESCRIBE stg_occ;
+DESCRIBE featured_data;
 
 -- =====================================================
 -- Sanity check - count rows in symbols table

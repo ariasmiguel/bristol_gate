@@ -461,7 +461,10 @@ class UnifiedDataPipeline:
             
             logger.info(f"📦 Saved timestamped file: {timestamped_path.name} ({timestamped_size_mb:.2f} MB)")
             
-            # Step 6: Save combined metadata and update symbols table
+            # Step 6: Store featured data in DuckDB featured_data table
+            self._store_featured_data_in_duckdb(df_featured_pd)
+            
+            # Step 7: Save combined metadata and update symbols table
             all_new_metadata = basic_metadata + domain_metadata
             if df_metadata_pd is not None and all_new_metadata:
                 combined_metadata = self._combine_metadata(df_metadata_pd, all_new_metadata)
@@ -470,7 +473,7 @@ class UnifiedDataPipeline:
                 combined_metadata.to_csv(metadata_path, index=False)
                 logger.info(f"💾 Saved combined metadata to: {metadata_path}")
                 
-                # Step 7: Update DuckDB symbols table with new feature symbols
+                # Step 8: Update DuckDB symbols table with new feature symbols
                 if update_symbols_table:
                     self._update_symbols_table(all_new_metadata)
             
@@ -585,6 +588,58 @@ class UnifiedDataPipeline:
             
         except Exception as e:
             logger.error(f"❌ Error updating symbols table: {e}")
+            return False
+    
+    def _store_featured_data_in_duckdb(self, df_featured: pd.DataFrame) -> bool:
+        """
+        Store featured data in DuckDB featured_data table in long format (date, symbol, value)
+        
+        Args:
+            df_featured: Featured dataset with date index and symbol columns
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            logger.info(f"📦 Storing featured data in DuckDB featured_data table...")
+            
+            # Connect to database
+            con = duckdb.connect(database=str(self.db_path), read_only=False)
+            
+            # Convert wide format to long format (date, symbol, value)
+            df_long = df_featured.reset_index().melt(
+                id_vars=['date'], 
+                var_name='symbol', 
+                value_name='value'
+            )
+            
+            # Filter out null values
+            df_long = df_long.dropna(subset=['value'])
+            
+            # Clear existing data (replace with new featured data)
+            con.execute("DELETE FROM featured_data")
+            logger.info("🗺️ Cleared existing featured_data table")
+            
+            # Insert new data
+            con.execute("""
+                INSERT INTO featured_data (date, symbol, value)
+                SELECT date, symbol, value FROM df_long
+            """)
+            
+            # Get row count for verification
+            row_count = con.execute("SELECT COUNT(*) as count FROM featured_data").df()['count'].iloc[0]
+            symbol_count = con.execute("SELECT COUNT(DISTINCT symbol) as count FROM featured_data").df()['count'].iloc[0]
+            
+            logger.info(f"✅ Successfully stored featured data in DuckDB:")
+            logger.info(f"   • Total rows: {row_count:,}")
+            logger.info(f"   • Unique symbols: {symbol_count:,}")
+            logger.info(f"   • Date range: {df_long['date'].min()} to {df_long['date'].max()}")
+            
+            con.close()
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error storing featured data in DuckDB: {e}")
             return False
     
     def _load_from_silver(self, 
