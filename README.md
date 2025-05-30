@@ -66,13 +66,23 @@ python scripts/run_features_pipeline.py
 
 **Option C: Docker (Easy Deployment)**
 ```bash
-# Copy environment template
-cp env.example .env
-# Edit .env with your API keys
+# Clone the repository and cd into it
+git clone https://github.com/ariasmiguel/bristol_gate.git
+cd bristol_gate
 
-# Run with Docker Compose
-docker-compose up bristol-gate-setup    # Initial setup
-docker-compose up bristol-gate          # Production run
+# Copy environment template and add your API keys
+cp env.example .env
+# nano .env  <-- Edit here
+
+# Run initial setup (one-time)
+docker-compose up bristol-gate-setup
+
+# Run the application (includes incremental update and keeps container alive)
+docker-compose up bristol-gate
+
+# To run scheduled updates, bring up the scheduler as well (or all services)
+# docker-compose up bristol-scheduler
+# docker-compose up # Starts all services defined
 ```
 
 ### **5. Access Your Data**
@@ -328,11 +338,11 @@ python scripts/run_features_pipeline.py --no-domain-features
 Running this pipeline gives you a **comprehensive financial dataset** ready for machine learning:
 
 ### **📊 Final Dataset Highlights**
-- **🗓️ Time Range**: 25+ years of daily data (1999-present)
-- **📈 Base Series**: 100+ economic and financial indicators
-- **🔧 Engineered Features**: 500+ ML-ready features
-- **📏 Dataset Size**: ~50-100 MB Parquet file
-- **⚡ Load Time**: 2-3 seconds vs hours for CSV
+- **🗓️ Time Range**: 1950-01-01 to 2025-05-29 (Over 75 years of daily data!)
+- **📈 Base Series**: ~250 initial economic and financial indicators from 8 sources.
+- **🔧 Engineered Features**: Over 6,700 ML-ready features/symbols in the `featured_data` table.
+- **📏 Dataset Size**: ~700-800 MB for the primary timestamped `featured_data_YYYYMMDD_HHMMSS.parquet` file in the silver layer.
+- **⚡ Database Records**: Over 181 million rows in the `featured_data` DuckDB table (long format).
 
 ### **🧮 Feature Categories**
 - **📊 Basic Features**: YoY changes, log transforms, moving averages
@@ -358,20 +368,29 @@ Bristol Gate now supports Docker for easy deployment and consistent environments
 
 ```bash
 # Quick start with Docker Compose
-git clone https://github.com/ariasmiguel/bristol_gate.git
-cd bristol_gate
-cp env.example .env  # Add your API keys
-docker-compose up
+# (Ensure you've cloned, cd'd into the repo, and configured .env)
+
+# Initial setup (downloads all data, sets up database - run once):
+docker-compose up bristol-gate-setup
+
+# Main application (runs incremental update, then keeps container alive for exec/logs):
+docker-compose up bristol-gate
+
+# For scheduled daily updates (runs cron daemon):
+# docker-compose up bristol-scheduler
+
+# To run all services including scheduler and monitor:
+# docker-compose up
 ```
 
-**Features:**
-- 🚀 **One-command deployment** with automated pipeline execution
-- 📊 **Scheduled daily updates** via built-in cron jobs  
-- 🔒 **Production-ready** with multi-stage builds and security best practices
-- 📈 **Monitoring & logging** with persistent volumes
-- 🌐 **Multi-platform** support (AMD64/ARM64)
+**Key Docker Features:**
+- 🚀 **Automated Pipeline**: `bristol-gate-setup` for initial full run, `bristol-gate` for ongoing use.
+- 📊 **Scheduled Updates**: `bristol-scheduler` for daily data refreshes via cron.
+- 🔒 **Production Ready**: Multi-stage builds, non-root user, health checks.
+- 💾 **Persistent Data**: Volumes for DuckDB, Parquet files, and logs.
+- 🌐 **Multi-platform**: Supports AMD64/ARM64 builds.
 
-See [DOCKER.md](DOCKER.md) for complete documentation.
+See [DOCKER.md](DOCKER.md) for complete documentation on Docker services, commands, monitoring, and more.
 
 ---
 
@@ -411,14 +430,25 @@ python scripts/run_features_pipeline.py
 ### **🎯 Your Results**
 
 After running the complete workflow:
-- **Raw data**: Stored in `bristol_gate.duckdb` and `data/bronze/` (Parquet files)
-- **Enhanced data**: `data/silver/final_aggregated_data_YYYYMMDD_HHMMSS.parquet`
-- **ML-ready features**: `data/silver/featured_data_YYYYMMDD_HHMMSS.parquet` ← **This is what you want!**
+- **Raw data**: Stored in `bristol_gate.duckdb` (staging tables like `stg_yahoo`, `stg_fred`, etc.) and `data/bronze/` (source-specific Parquet files).
+- **Aggregated Base Data**: `data/silver/final_aggregated_data_YYYYMMDD_HHMMSS.parquet` (interpolated base data before extensive feature engineering).
+- **ML-ready features**: `data/silver/featured_data_YYYYMMDD_HHMMSS.parquet` and in the `featured_data` table in `bristol_gate.duckdb`. ← **This is what you want!**
 
 ```python
 import pandas as pd
-df = pd.read_parquet('data/silver/featured_data.parquet')  # Latest file
-print(f"🎉 Ready for ML: {df.shape[0]:,} rows × {df.shape[1]:,} features")
+import duckdb
+
+# Option 1: Load from the latest Parquet file (wide format, features as columns)
+# Note: You might need to find the exact timestamped filename, e.g., using: ls -t data/silver/featured_data_*.parquet | head -n 1
+df_parquet = pd.read_parquet('data/silver/featured_data_20250530_103517.parquet') 
+print(f"🎉 Parquet Ready for ML: {df_parquet.shape[0]:,} rows × {df_parquet.shape[1]:,} features (columns)")
+
+# Option 2: Query from DuckDB (long format)
+conn = duckdb.connect('bristol_gate.duckdb')
+featured_data_count = conn.execute('SELECT COUNT(*) FROM featured_data').fetchone()[0]
+featured_symbols_count = conn.execute('SELECT COUNT(DISTINCT symbol) FROM featured_data').fetchone()[0]
+print(f"🎉 DuckDB Ready for ML: {featured_data_count:,} total rows, {featured_symbols_count:,} unique features/symbols in long format")
+conn.close()
 ```
 
 ## 📁 Output Structure

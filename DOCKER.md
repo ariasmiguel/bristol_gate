@@ -36,9 +36,10 @@ docker run -d \
 ## 📋 **What's Included**
 
 ### **Docker Services**
-- **`bristol-gate`**: Main application container
-- **`bristol-scheduler`**: Automated daily updates via cron
-- **`setup`**: Database initialization service
+- **`bristol-gate-setup`**: Service for initial one-time setup (database, package install).
+- **`bristol-gate-app`**: Main application container for running the pipeline (e.g., via `incremental_update.sh`).
+- **`bristol-scheduler`**: Automated daily updates via cron.
+- **`bristol-monitor`**: Optional service for basic monitoring of pipeline outputs.
 
 ### **Features**
 - ✅ **Multi-stage build** for optimal image size
