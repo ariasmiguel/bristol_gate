@@ -150,7 +150,7 @@ class SP500Fetcher(BaseDataFetcher):
             # Wait for download completion using utility method
             downloaded_file = self.file_downloader.wait_for_download_completion(
                 timeout=15,
-                expected_filename=self.filename
+                file_extension=".xlsx"
             )
             
             return downloaded_file
@@ -227,7 +227,7 @@ class SP500Fetcher(BaseDataFetcher):
             )
             
             # Convert values to numeric using utility method
-            df_quarterly_melted = self.data_transformer.convert_to_numeric(
+            df_quarterly_melted = self.data_transformer.standardize_numeric_columns(
                 df_quarterly_melted, 
                 ['value']
             )
@@ -296,7 +296,7 @@ class SP500Fetcher(BaseDataFetcher):
             )
             
             # Convert values to numeric using utility method
-            df_estimates_melted = self.data_transformer.convert_to_numeric(
+            df_estimates_melted = self.data_transformer.standardize_numeric_columns(
                 df_estimates_melted,
                 ['value']
             )
@@ -320,7 +320,7 @@ class SP500Fetcher(BaseDataFetcher):
                 return pd.DataFrame()
             
             # Final numeric conversion using utility method
-            df_combined = self.data_transformer.convert_to_numeric(df_combined, ['value'])
+            df_combined = self.data_transformer.standardize_numeric_columns(df_combined, ['value'])
             
             # Clean data using utility method
             df_combined = self.data_transformer.clean_and_validate_data(
