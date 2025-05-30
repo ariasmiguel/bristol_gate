@@ -103,4 +103,8 @@ coverage.xml
 # mypy
 .mypy_cache/
 .dmypy.json
-dmypy.json 
+dmypy.json
+
+# Data files
+data/silver/featured_symbols_metadata.csv
+data/symbols_corrected.csv 
